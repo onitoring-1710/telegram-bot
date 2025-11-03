@@ -28,7 +28,7 @@ async def send_reminder(context: ContextTypes.DEFAULT_TYPE):
     )
 
 # === Обработка нажатия кнопки ===
-async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def button_callback(update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()  # обязательно, чтобы убрать "часики" на кнопке
 
@@ -48,7 +48,7 @@ def remove_job_if_exists(name: str, context: ContextTypes.DEFAULT_TYPE) -> bool:
     return True
 
 # === Команда /start ===
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def start(update, context: ContextTypes.DEFAULT_TYPE):
     remove_job_if_exists("daily_reminder", context)
 
     context.job_queue.run_daily(
@@ -61,7 +61,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(chat_id=USER_ID_OWNER, text="✅ Дашуля включила напоминание.")
 
 # === Команда /stop ===
-async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def stop(update, context: ContextTypes.DEFAULT_TYPE):
     remove_job_if_exists("daily_reminder", context)
     await update.message.reply_text("🛑 Напоминания остановлены.")
     await context.bot.send_message(chat_id=USER_ID_OWNER, text="🛑 Дашуля выключила напоминание.")
@@ -90,4 +90,5 @@ def main():
     app_bot.run_polling()
 
 if __name__ == "__main__":
+
     main()
