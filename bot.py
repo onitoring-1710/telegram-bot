@@ -28,7 +28,7 @@ async def send_reminder(context: ContextTypes.DEFAULT_TYPE):
     )
 
 # === Обработка нажатия кнопки ===
-async def button_callback(update, context: ContextTypes.DEFAULT_TYPE):
+async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()  # обязательно, чтобы убрать "часики" на кнопке
 
@@ -48,7 +48,7 @@ def remove_job_if_exists(name: str, context: ContextTypes.DEFAULT_TYPE) -> bool:
     return True
 
 # === Команда /start ===
-async def start(update, context: ContextTypes.DEFAULT_TYPE):
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     remove_job_if_exists("daily_reminder", context)
 
     context.job_queue.run_daily(
@@ -61,20 +61,20 @@ async def start(update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(chat_id=USER_ID_OWNER, text="✅ Дашуля включила напоминание.")
 
 # === Команда /stop ===
-async def stop(update, context: ContextTypes.DEFAULT_TYPE):
+async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     remove_job_if_exists("daily_reminder", context)
     await update.message.reply_text("🛑 Напоминания остановлены.")
     await context.bot.send_message(chat_id=USER_ID_OWNER, text="🛑 Дашуля выключила напоминание.")
 
 # === FastAPI сервер для Keep Alive ===
-app = FastAPI()
+app_web = FastAPI()
 
-@app.get("/")
+@app_web.get("/")
 def root():
     return {"status": "Bot is alive"}
 
 def start_webserver():
-    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))
+    uvicorn.run(app_web, host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))
 
 # === Основной запуск ===
 def main():
@@ -90,5 +90,5 @@ def main():
     app_bot.run_polling()
 
 if __name__ == "__main__":
-
     main()
+
