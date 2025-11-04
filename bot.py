@@ -1,26 +1,18 @@
-import os
 import datetime
+import os
+import threading
 import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQueryHandler
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackQueryHandler
 from fastapi import FastAPI
 import uvicorn
 
-# === Конфиги ===
 BOT_TOKEN = os.environ["BOT_TOKEN"]
 USER_ID = int(os.environ["USER_ID"])
 USER_ID_OWNER = int(os.environ["USER_ID_OWNER"])
+
 moscow_tz = datetime.timezone(datetime.timedelta(hours=3))
-PORT = int(os.environ.get("PORT", 8000))  # Render требует прослушивания порта
 
-# === FastAPI для Keep-Alive ===
-app_web = FastAPI()
-
-@app_web.get("/")
-def root():
-    return {"status": "Bot is alive"}
-
-# === Напоминание ===
 async def send_reminder(context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton("Я выпила. ❤️", callback_data="drank")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -34,7 +26,6 @@ async def send_reminder(context: ContextTypes.DEFAULT_TYPE):
         sticker="CAACAgIAAxkBAAE9XXRpCSA6OsGhJ0mtYB2IcNsbSg2eugACWwADVmQBFIoTkT5MbLkXNgQ"
     )
 
-# === Обработка кнопки ===
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -42,16 +33,14 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(text="Умничка, солнце. ❤️")
         await context.bot.send_message(chat_id=USER_ID_OWNER, text="✅ Дашуля выпила витамины.")
 
-# === Работа с задачами ===
 def remove_job_if_exists(name: str, context: ContextTypes.DEFAULT_TYPE) -> bool:
-    jobs = context.job_queue.get_jobs_by_name(name)
-    if not jobs:
+    current_jobs = context.job_queue.get_jobs_by_name(name)
+    if not current_jobs:
         return False
-    for job in jobs:
+    for job in current_jobs:
         job.schedule_removal()
     return True
 
-# === Команды /start и /stop ===
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     remove_job_if_exists("daily_reminder", context)
     context.job_queue.run_daily(
@@ -59,6 +48,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         time=datetime.time(hour=11, minute=15, tzinfo=moscow_tz),
         name="daily_reminder"
     )
+
     await update.message.reply_text("✅ Напоминания включены! Каждый день в 11:15.")
     await context.bot.send_message(chat_id=USER_ID_OWNER, text="✅ Дашуля включила напоминание.")
 
@@ -67,30 +57,26 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🛑 Напоминания остановлены.")
     await context.bot.send_message(chat_id=USER_ID_OWNER, text="🛑 Дашуля выключила напоминание.")
 
-# === Асинхронный запуск бота + FastAPI ===
-async def main_async():
-    # Создаём приложение Telegram бота
-    app_bot = Application.builder().token(BOT_TOKEN).build()
+app_web = FastAPI()
 
-    # Регистрируем команды
+@app_web.get("/")
+def root():
+    return {"status": "Bot is alive"}
+
+def start_webserver():
+    config = uvicorn.Config(app_web, host="0.0.0.0", port=int(os.environ.get("PORT", 8000)), log_level="info")
+    server = uvicorn.Server(config)
+    asyncio.run(server.serve())
+
+def main():
+    threading.Thread(target=start_webserver, daemon=True).start()
+
+    app_bot = ApplicationBuilder().token(BOT_TOKEN).build()
     app_bot.add_handler(CommandHandler("start", start))
     app_bot.add_handler(CommandHandler("stop", stop))
     app_bot.add_handler(CallbackQueryHandler(button_callback))
 
-    # Инициализация приложения
-    await app_bot.initialize()
-    await app_bot.start()
+    app_bot.run_polling()
 
-    # Запуск polling бота асинхронно
-    bot_task = asyncio.create_task(app_bot.updater.start_polling())
-
-    # Запуск FastAPI на Render
-    uvicorn_task = asyncio.create_task(
-        uvicorn.run(app_web, host="0.0.0.0", port=PORT, log_level="info")
-    )
-
-    # Ожидание завершения обоих процессов
-    await asyncio.gather(bot_task, uvicorn_task)
-
-if __name__ == "__main__":
-    asyncio.run(main_async())
+if __name__ == "main":
+    main()
