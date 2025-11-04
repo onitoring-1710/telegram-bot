@@ -2,7 +2,7 @@ import os
 import datetime
 import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackQueryHandler
+from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQueryHandler
 from fastapi import FastAPI
 import uvicorn
 
@@ -67,18 +67,29 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🛑 Напоминания остановлены.")
     await context.bot.send_message(chat_id=USER_ID_OWNER, text="🛑 Дашуля выключила напоминание.")
 
-# === Основной запуск асинхронно для Render ===
+# === Асинхронный запуск бота + FastAPI ===
 async def main_async():
-    # Telegram-бот
-    app_bot = ApplicationBuilder().token(BOT_TOKEN).build()
+    # Создаём приложение Telegram бота
+    app_bot = Application.builder().token(BOT_TOKEN).build()
+
+    # Регистрируем команды
     app_bot.add_handler(CommandHandler("start", start))
     app_bot.add_handler(CommandHandler("stop", stop))
     app_bot.add_handler(CallbackQueryHandler(button_callback))
 
-    # Запуск бота и FastAPI параллельно
-    bot_task = asyncio.create_task(app_bot.run_polling())
-    uvicorn_task = asyncio.create_task(uvicorn.run(app_web, host="0.0.0.0", port=PORT, log_level="info"))
+    # Инициализация приложения
+    await app_bot.initialize()
+    await app_bot.start()
 
+    # Запуск polling бота асинхронно
+    bot_task = asyncio.create_task(app_bot.updater.start_polling())
+
+    # Запуск FastAPI на Render
+    uvicorn_task = asyncio.create_task(
+        uvicorn.run(app_web, host="0.0.0.0", port=PORT, log_level="info")
+    )
+
+    # Ожидание завершения обоих процессов
     await asyncio.gather(bot_task, uvicorn_task)
 
 if __name__ == "__main__":
