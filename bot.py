@@ -75,7 +75,7 @@ def main():
     # Запуск FastAPI в отдельном потоке
     threading.Thread(target=start_webserver, daemon=True).start()
 
-    updater = Updater(BOT_TOKEN, use_context=True)
+    updater = Updater(BOT_TOKEN)
     dp = updater.dispatcher
 
     dp.add_handler(CommandHandler("start", start))
@@ -87,3 +87,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
